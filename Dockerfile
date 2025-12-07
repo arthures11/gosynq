@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy the binary from the builder stage
-COPY --from=builder /mini-asynq .
+COPY --from=builder /mini-asynq /app/mini-asynq
 
 # Copy configuration files if needed
 # COPY config.yaml .

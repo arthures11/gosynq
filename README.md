@@ -1,43 +1,41 @@
-# GoSynq - Lightweight Background Job System
+# Mini Asynq - Lightweight Background Job System
 
-A minimalist Asynq-like background job system built with Go, Gin, and Postgres.
+A minimal Asynq-like background job processing system built with Go, Gin, and PostgreSQL.
 
 ## Features
 
-✅ **Core Job Processing**
-- Fixed worker pool with configurable size
-- Prioritized queues (low, normal, high, critical)
-- Atomic job pickup using `SELECT ... FOR UPDATE SKIP LOCKED`
-- Visibility timeout/lease mechanism
+### ✅ Core Features
+- **Fixed Worker Pool** - Configurable number of concurrent workers
+- **Prioritized Queues** - Support for multiple priority levels (high, normal, low)
+- **Atomic Job Pickup** - Safe distributed processing using `SELECT ... FOR UPDATE SKIP LOCKED`
+- **Retry Mechanism** - Configurable retry strategies (fixed/exponential backoff)
+- **Visibility Timeout** - Job leases with configurable timeouts
+- **Idempotency Keys** - Prevent duplicate job processing
 
-✅ **Reliability Features**
-- Retry logic with configurable backoff (fixed/exponential)
-- Job status tracking (pending, processing, completed, failed, cancelled)
-- Idempotency keys to prevent duplicate processing
+### ✅ REST API
+- **Job Management** - Enqueue, list, get details
+- **Admin Endpoints** - Retry, cancel jobs (with basic auth)
+- **Health Checks** - System status monitoring
 
-✅ **API & Monitoring**
-- REST API for job management
-- WebSocket for real-time job events
-- Basic Prometheus metrics
-- Health endpoints
+### ✅ Real-time Features
+- **WebSocket Events** - Push notifications for job lifecycle events
+- **Dashboard UI** - Real-time job monitoring and management
 
-✅ **Operational**
-- Graceful shutdown and draining
-- Docker Compose for local development
-- Database migrations
+### ✅ Operational Features
+- **Graceful Shutdown** - Proper cleanup on SIGINT/SIGTERM
+- **Prometheus Metrics** - Monitoring and observability
+- **Docker Compose** - Easy local development setup
+- **Database Migrations** - Schema management
 
 ## Architecture
 
-```mermaid
-graph TD
-    Client -->|HTTP| API
-    API -->|Enqueue| Dispatcher
-    Dispatcher -->|Assign| WorkerPool
-    WorkerPool -->|Process| Worker
-    Worker -->|Pick Job| Postgres
-    Worker -->|Update Status| Postgres
-    Worker -->|Events| WebSocket
-    Client -->|Subscribe| WebSocket
+```
+┌───────────────────────────────────────────────────────────────┐
+│                        Mini Asynq System                          │
+├─────────────────┬─────────────────┬─────────────────┬─────────┤
+│   REST API       │  WebSocket       │   Workers        │  DB     │
+│  (Gin)           │  (Gorilla)        │  (Fixed Pool)    │ (Postgres)│
+└─────────────────┴─────────────────┴─────────────────┴─────────┘
 ```
 
 ## Quick Start
@@ -45,174 +43,156 @@ graph TD
 ### Prerequisites
 - Go 1.21+
 - Docker & Docker Compose
-- Postgres 15+
+- PostgreSQL 15+
+
+### Running with Docker
+
+```bash
+# Start the system
+docker-compose up --build
+
+# Access the dashboard
+http://localhost:8080
+
+# Admin credentials
+Username: admin
+Password: password
+```
 
 ### Running Locally
 
-1. **Start the system:**
 ```bash
-docker-compose up --build
-```
+# Start PostgreSQL
+docker-compose up -d postgres
 
-2. **Run database migrations:**
-```bash
-# Connect to Postgres and run the migration SQL
-psql -h localhost -U postgres -d gosynq_db -f migrations/sql/001_init_schema.up.sql
-```
+# Run the server
+go run cmd/server/main.go
 
-3. **Test the system:**
-```bash
+# Run the demo job generator (in another terminal)
 go run demo/demo.go
 ```
 
-### API Endpoints
+## API Endpoints
 
+### Jobs
 - `POST /api/v1/jobs` - Enqueue a new job
-- `GET /api/v1/jobs` - List jobs (filter by status/queue)
-- `GET /api/v1/jobs/{id}` - Get job details
+- `GET /api/v1/jobs` - List all jobs
+- `GET /api/v1/jobs/:id` - Get job details
+
+### Admin (Basic Auth Required)
+- `POST /api/v1/admin/jobs/:id/retry` - Retry a failed job
+- `POST /api/v1/admin/jobs/:id/cancel` - Cancel a pending job
+- `POST /api/v1/admin/queues/:queue/pause` - Pause a queue
+- `POST /api/v1/admin/queues/:queue/resume` - Resume a queue
+
+### WebSocket
+- `GET /api/v1/ws` - Real-time job events
+
+### Monitoring
 - `GET /api/v1/health` - Health check
-
-### Job Payload Example
-
-```json
-{
-  "queue": "high",
-  "payload": {
-    "task": "send_email",
-    "to": "user@example.com",
-    "subject": "Welcome!"
-  },
-  "max_retries": 3,
-  "priority": "high"
-}
-```
+- `GET /api/v1/metrics` - Prometheus metrics
 
 ## Configuration
 
-Edit `internal/config/config.go` for default settings:
+Configuration is handled through environment variables:
 
-```go
-ServerConfig{
-    Port:        8080,
-    Host:        "localhost",
-    MetricsPort: 9090,
-},
-DatabaseConfig{
-    Host:     "localhost",
-    Port:     5432,
-    User:     "postgres",
-    Password: "postgres",
-    DBName:   "mini_asynq",
-    SSLMode:  "disable",
-},
-WorkerConfig{
-    PoolSize:          10,
-    VisibilityTimeout: 30 * time.Second,
-    Concurrency:       5,
-},
-RetryConfig{
-    DefaultStrategy:   "exponential",
-    DefaultInterval:   5,
-    MaxAttempts:       5,
-    ExponentialBase:   2.0,
-},
+```env
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=gosynq_db
+DB_SSLMODE=disable
+
+# Server
+SERVER_PORT=8080
+GIN_MODE=release
+
+# Workers
+WORKER_POOL_SIZE=5
+VISIBILITY_TIMEOUT=30s
+
+# Retries
+RETRY_STRATEGY=exponential
+RETRY_INTERVAL=5
+MAX_RETRY_ATTEMPTS=3
+```
+
+## Database Schema
+
+### Jobs Table
+```sql
+CREATE TABLE jobs (
+    id UUID PRIMARY KEY,
+    queue VARCHAR(255) NOT NULL,
+    payload JSONB NOT NULL,
+    max_retries INTEGER NOT NULL DEFAULT 0,
+    run_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    priority VARCHAR(50) NOT NULL DEFAULT 'normal',
+    idempotency_key VARCHAR(255),
+    locked_by VARCHAR(255),
+    locked_at TIMESTAMPTZ
+);
+```
+
+### Job Attempts Table
+```sql
+CREATE TABLE job_attempts (
+    id UUID PRIMARY KEY,
+    job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    attempt_number INTEGER NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    status VARCHAR(50) NOT NULL,
+    error_message TEXT,
+    UNIQUE(job_id, attempt_number)
+);
 ```
 
 ## Development
 
 ### Running Tests
 ```bash
+# Unit tests
 go test ./...
+
+# Integration tests (requires running PostgreSQL)
+go test -tags=integration ./...
 ```
 
 ### Building
 ```bash
+# Build the server
 go build -o mini-asynq cmd/server/main.go
-```
 
-### Running Migrations
-```bash
-# Apply migrations
-psql -h localhost -U postgres -d mini_asynq -f migrations/sql/001_init_schema.up.sql
-
-# Rollback (if needed)
-psql -h localhost -U postgres -d mini_asynq -f migrations/sql/001_init_schema.down.sql
-```
-
-## Job Processing Flow
-
-1. **Enqueue**: Client sends job via REST API
-2. **Pickup**: Worker atomically picks job using `SKIP LOCKED`
-3. **Process**: Worker executes job handler
-4. **Complete**: Job status updated, events sent via WebSocket
-5. **Retry**: Failed jobs retried with backoff (if configured)
-
-## Atomic Job Pickup
-
-The system uses Postgres' `SELECT ... FOR UPDATE SKIP LOCKED` to ensure safe concurrent job pickup:
-
-```sql
-SELECT id, queue, payload, max_retries, run_at, created_at, updated_at,
-       status, priority, idempotency_key
-FROM jobs
-WHERE status = 'pending'
-AND run_at <= NOW()
-ORDER BY priority DESC, created_at ASC
-FOR UPDATE SKIP LOCKED
-LIMIT 1
-```
-
-This ensures:
-- Only one worker can pick a job at a time
-- No race conditions between multiple instances
-- Efficient queue processing
-
-## Retry Logic
-
-Configurable retry strategies:
-- **Fixed**: Retry every N seconds
-- **Exponential**: Retry with exponential backoff (2^N * base)
-
-Example exponential backoff:
-- Attempt 1: 5 seconds
-- Attempt 2: 10 seconds
-- Attempt 3: 20 seconds
-- Attempt 4: 40 seconds
-- Attempt 5: 80 seconds
-
-## WebSocket Events
-
-Real-time job events:
-```json
-{
-  "type": "created|started|succeeded|failed",
-  "job_id": "abc-123",
-  "queue": "default",
-  "timestamp": "2023-01-01T00:00:00Z",
-  "payload": {...},
-  "error": "error message (if failed)"
-}
+# Build the demo
+go build -o demo-cli demo/demo.go
 ```
 
 ## Roadmap
 
-- [ ] Add WebSocket endpoint implementation
-- [ ] Implement Prometheus metrics collection
-- [ ] Add admin endpoints (retry, cancel, pause queue)
-- [ ] Implement dead-letter queue
-- [ ] Add scheduling with `run_at` field
-- [ ] Implement idempotency key handling
-- [ ] Add comprehensive unit tests
-- [ ] Build Angular UI dashboard
+- [x] Core job processing with worker pool
+- [x] Atomic job pickup with SKIP LOCKED
+- [x] Retry logic with configurable backoff
+- [x] WebSocket real-time events
+- [x] Admin UI with basic auth
+- [x] Prometheus metrics integration
+- [x] Docker Compose setup
+- [x] Demo job generator
+- [ ] Queue pausing/resuming
+- [ ] Dead letter queue
+- [ ] Advanced scheduling
+- [ ] Job dependencies
+- [ ] Rate limiting
 
 ## Contributing
 
-Pull requests welcome! Please:
-1. Write tests for new features
-2. Follow existing code style
-3. Document new functionality
-4. Update README if needed
+Contributions are welcome! Please open issues for bugs or feature requests.
 
 ## License
 
-MIT
+MIT License

@@ -126,6 +126,17 @@ func (r *PostgresRepository) UpdateJobStatus(ctx context.Context, jobID string, 
 	return err
 }
 
+func (r *PostgresRepository) UpdateJobForRetry(ctx context.Context, jobID string, runAt time.Time) error {
+	query := `
+		UPDATE jobs
+		SET status = 'pending', run_at = $1, locked_by = NULL, locked_at = NULL, updated_at = NOW()
+		WHERE id = $2
+	`
+
+	_, err := r.db.ExecContext(ctx, query, runAt, jobID)
+	return err
+}
+
 func (r *PostgresRepository) CreateJobAttempt(ctx context.Context, attempt *models.JobAttempt) error {
 	query := `
 		INSERT INTO job_attempts (

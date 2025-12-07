@@ -16,6 +16,7 @@ import (
 	"github.com/arthures11/gosynq/internal/dispatcher"
 	"github.com/arthures11/gosynq/internal/models"
 	"github.com/arthures11/gosynq/internal/repository"
+	"github.com/arthures11/gosynq/internal/websocket"
 	"github.com/arthures11/gosynq/internal/worker"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -46,12 +47,16 @@ func main() {
 		},
 	})
 
+	// Create WebSocket server
+	wsServer := websocket.NewWebSocketServer(disp.GetEventChannel())
+	wsServer.Start(context.Background())
+
 	// Start dispatcher
 	ctx, cancel := context.WithCancel(context.Background())
 	disp.Start(ctx)
 
 	// Set up HTTP server
-	router := setupRouter(disp, repo)
+	router := setupRouter(disp, repo, wsServer)
 
 	// Set up graceful shutdown
 	go func() {
@@ -64,6 +69,13 @@ func main() {
 
 		// Shutdown dispatcher
 		disp.Shutdown()
+
+		// Shutdown WebSocket server
+		wsServer.Shutdown()
+
+		// TODO: Save final metrics before shutdown
+		log.Println("Saving final metrics before shutdown...")
+
 		cancel()
 
 		// Shutdown HTTP server
@@ -108,7 +120,7 @@ func setupDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func setupRouter(disp *dispatcher.Dispatcher, repo *repository.PostgresRepository) *gin.Engine {
+func setupRouter(disp *dispatcher.Dispatcher, repo *repository.PostgresRepository, wsServer *websocket.WebSocketServer) *gin.Engine {
 	router := gin.Default()
 
 	// API routes
@@ -182,11 +194,81 @@ func setupRouter(disp *dispatcher.Dispatcher, repo *repository.PostgresRepositor
 
 				c.JSON(http.StatusOK, job)
 			})
+
+			// Admin endpoints
+			admin := api.Group("/admin", gin.BasicAuth(gin.Accounts{
+				"admin": "password", // TODO: Make configurable
+			}))
+			{
+				admin.POST("/jobs/:id/retry", func(c *gin.Context) {
+					jobID := c.Param("id")
+
+					// Get current job
+					job, err := repo.GetJobByID(c.Request.Context(), jobID)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+					if job == nil {
+						c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+						return
+					}
+
+					// Reset job to pending for retry
+					err = repo.UpdateJobStatus(c.Request.Context(), jobID, models.StatusPending)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+
+					c.JSON(http.StatusOK, gin.H{"status": "retry scheduled"})
+				})
+
+				admin.POST("/jobs/:id/cancel", func(c *gin.Context) {
+					jobID := c.Param("id")
+
+					// Cancel the job
+					err := repo.UpdateJobStatus(c.Request.Context(), jobID, models.StatusCancelled)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+
+					c.JSON(http.StatusOK, gin.H{"status": "job cancelled"})
+				})
+
+				admin.POST("/queues/:queue/pause", func(c *gin.Context) {
+					// TODO: Implement queue pausing logic
+					c.JSON(http.StatusOK, gin.H{"status": "queue pause not implemented"})
+				})
+
+				admin.POST("/queues/:queue/resume", func(c *gin.Context) {
+					// TODO: Implement queue resuming logic
+					c.JSON(http.StatusOK, gin.H{"status": "queue resume not implemented"})
+				})
+			}
 		}
 
 		// Health check
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+		})
+
+		// WebSocket endpoint
+		api.GET("/ws", func(c *gin.Context) {
+			wsServer.HandleWebSocket(c.Writer, c.Request)
+		})
+
+		// Metrics endpoint
+		api.GET("/metrics", func(c *gin.Context) {
+			// TODO: Implement Prometheus metrics endpoint
+			c.JSON(http.StatusOK, gin.H{"status": "metrics not implemented"})
+		})
+
+		// Serve frontend
+		router.Static("/frontend", "./frontend")
+		router.GET("/", func(c *gin.Context) {
+			c.Redirect(http.StatusFound, "/frontend/index.html")
 		})
 	}
 

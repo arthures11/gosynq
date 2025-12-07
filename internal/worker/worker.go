@@ -194,7 +194,12 @@ func (w *Worker) handleJobFailure(ctx context.Context, job *models.Job, err erro
 			job.Status = models.StatusPending
 			job.RunAt = time.Now().Add(delay)
 
-			// TODO: Implement job update with new run_at
+			// Update job in database with new run_at and reset status
+			err := w.repo.UpdateJobForRetry(ctx, job.ID, job.RunAt)
+			if err != nil {
+				return fmt.Errorf("failed to update job for retry: %w", err)
+			}
+
 			log.Printf("Job %s will be retried in %v", job.ID, delay)
 			return nil
 		}

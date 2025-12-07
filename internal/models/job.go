@@ -66,6 +66,14 @@ type JobEvent struct {
 	Error     string      `json:"error,omitempty"`
 }
 
+func (e *JobEvent) ToJSON() string {
+	data, err := json.Marshal(e)
+	if err != nil {
+		return `{"error":"failed to marshal event"}`
+	}
+	return string(data)
+}
+
 func (j *Job) IsRetryable() bool {
 	return j.MaxRetries > 0
 }

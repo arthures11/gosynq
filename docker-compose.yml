@@ -29,6 +29,7 @@ services:
     ports:
       - "8080:8080"
       - "9090:9090"
+      - "2112:2112"  # Prometheus metrics port
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -36,9 +37,11 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: gosynq_db
       DB_SSLMODE: disable
+      GIN_MODE: release
+      METRICS_PORT: 2112
     volumes:
       - .:/app
-    command: go run cmd/server/main.go
+    command: ./mini-asynq
 
 volumes:
   postgres_data:

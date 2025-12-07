@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/arthures11/gosynq/internal/metrics"
 	"github.com/arthures11/gosynq/internal/models"
 	"github.com/arthures11/gosynq/internal/repository"
 	"github.com/arthures11/gosynq/internal/worker"
@@ -21,6 +22,7 @@ type Dispatcher struct {
 	shutdownCh chan struct{}
 	shutdownWg sync.WaitGroup
 	config     DispatcherConfig
+	metrics    *metrics.Metrics
 }
 
 type DispatcherConfig struct {
@@ -36,6 +38,7 @@ func NewDispatcher(repo *repository.PostgresRepository, config DispatcherConfig)
 		eventChan:  make(chan models.JobEvent, 100), // Buffered channel
 		shutdownCh: make(chan struct{}),
 		config:     config,
+		metrics:    metrics.NewMetrics(),
 	}
 }
 
@@ -101,6 +104,10 @@ func (d *Dispatcher) processEvents(ctx context.Context) {
 	}
 }
 
+func (d *Dispatcher) GetEventChannel() <-chan models.JobEvent {
+	return d.eventChan
+}
+
 func (d *Dispatcher) EnqueueJob(ctx context.Context, job *models.Job) error {
 	// Set default values
 	if job.Status == "" {
@@ -141,8 +148,4 @@ func (d *Dispatcher) Shutdown() {
 
 	close(d.eventChan)
 	log.Println("Dispatcher shutdown complete")
-}
-
-func (d *Dispatcher) GetEventChannel() <-chan models.JobEvent {
-	return d.eventChan
 }
