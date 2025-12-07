@@ -1,0 +1,13 @@
+/* Dashboard component styles */
+.health-indicator {
+  transition: all 0.3s ease;
+}
+
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}

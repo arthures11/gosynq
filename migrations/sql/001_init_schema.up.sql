@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS jobs (
     idempotency_key VARCHAR(255),
     locked_by VARCHAR(255),
     locked_at TIMESTAMPTZ,
-    CONSTRAINT fk_queue CHECK (queue IN ('default', 'high', 'low', 'critical'))
 );
 
 -- Create job_attempts table

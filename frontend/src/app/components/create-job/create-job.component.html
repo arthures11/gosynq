@@ -1,0 +1,66 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Create New Job</h1>
+
+    <!-- Error message -->
+    <div *ngIf="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      {{ error }}
+      <button (click)="error = null" class="float-right text-red-800 hover:text-red-600">×</button>
+    </div>
+
+    <!-- Success message -->
+    <div *ngIf="success" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+      {{ success }}
+    </div>
+
+    <form (ngSubmit)="createJob()" class="bg-white shadow-sm rounded-lg p-6">
+      <div class="space-y-4">
+        <div>
+          <label for="queue" class="block text-sm font-medium text-gray-700 mb-1">Queue</label>
+          <input type="text" id="queue" [(ngModel)]="jobData.queue" name="queue"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <div>
+          <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <select id="priority" [(ngModel)]="jobData.priority" name="priority"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            <option *ngFor="let priority of getPriorityOptions()" [value]="priority">
+              {{ priority | titlecase }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="max_retries" class="block text-sm font-medium text-gray-700 mb-1">Max Retries</label>
+          <input type="number" id="max_retries" [(ngModel)]="jobData.max_retries" name="max_retries" min="0" max="10"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <div>
+          <label for="idempotency_key" class="block text-sm font-medium text-gray-700 mb-1">Idempotency Key (optional)</label>
+          <input type="text" id="idempotency_key" [(ngModel)]="jobData.idempotency_key" name="idempotency_key"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+        </div>
+
+        <div>
+          <label for="payload" class="block text-sm font-medium text-gray-700 mb-1">Payload (JSON)</label>
+          <textarea id="payload" [(ngModel)]="jobData.payload" name="payload" rows="8"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"></textarea>
+          <p class="text-xs text-gray-500 mt-1">Enter valid JSON payload for the job</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex space-x-3">
+        <button type="submit" [disabled]="isSubmitting"
+                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          {{ isSubmitting ? 'Creating...' : 'Create Job' }}
+        </button>
+        <button type="button" (click)="resetForm()"
+                class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+          Reset
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

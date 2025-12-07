@@ -22,7 +22,6 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *models.Job) err
 		INSERT INTO jobs (
 			id, queue, payload, max_retries, run_at, priority, idempotency_key
 		) VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (idempotency_key) DO NOTHING
 		RETURNING created_at, updated_at
 	`
 
@@ -44,12 +43,13 @@ func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*models
 	`
 
 	var job models.Job
+	var lockedBy sql.NullString
 	var lockedAt pq.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&job.ID, &job.Queue, &job.Payload, &job.MaxRetries, &job.RunAt,
 		&job.CreatedAt, &job.UpdatedAt, &job.Status, &job.Priority,
-		&job.IdempotencyKey, &job.LockedBy, &lockedAt,
+		&job.IdempotencyKey, &lockedBy, &lockedAt,
 	)
 
 	if err != nil {
@@ -57,6 +57,10 @@ func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*models
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	if lockedBy.Valid {
+		job.LockedBy = lockedBy.String
 	}
 
 	if lockedAt.Valid {
@@ -172,15 +176,20 @@ func (r *PostgresRepository) ListJobs(ctx context.Context, statusFilter string, 
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
+		var lockedBy sql.NullString
 		var lockedAt pq.NullTime
 
 		err := rows.Scan(
 			&job.ID, &job.Queue, &job.Payload, &job.MaxRetries, &job.RunAt,
 			&job.CreatedAt, &job.UpdatedAt, &job.Status, &job.Priority,
-			&job.IdempotencyKey, &job.LockedBy, &lockedAt,
+			&job.IdempotencyKey, &lockedBy, &lockedAt,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		if lockedBy.Valid {
+			job.LockedBy = lockedBy.String
 		}
 
 		if lockedAt.Valid {
@@ -228,4 +237,30 @@ func (r *PostgresRepository) GetJobAttempts(ctx context.Context, jobID string) (
 	}
 
 	return attempts, nil
+}
+
+func (r *PostgresRepository) GetJobStats(ctx context.Context) (map[string]int, error) {
+	query := `
+		SELECT status, COUNT(*)
+		FROM jobs
+		GROUP BY status
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make(map[string]int)
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		stats[status] = count
+	}
+
+	return stats, nil
 }

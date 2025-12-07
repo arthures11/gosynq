@@ -50,7 +50,7 @@ func NewDefaultConfig() *Config {
 			Host:     "localhost",
 			Port:     5432,
 			User:     "postgres",
-			Password: "postgres",
+			Password: "12345",
 			DBName:   "gosynq_db",
 			SSLMode:  "disable",
 		},

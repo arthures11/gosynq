@@ -54,33 +54,45 @@ func (w *Worker) Start(ctx context.Context) {
 			log.Printf("Worker %s shutting down", w.id)
 			return
 		default:
+			log.Printf("Worker %s attempting to pick and process job", w.id)
 			job, err := w.pickAndProcessJob(ctx)
 			if err != nil {
-				log.Printf("Worker %s error: %v", w.id, err)
+				log.Printf("Worker %s error processing job: %v", w.id, err)
 				// Add some jitter to avoid thundering herd
 				time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 				continue
 			}
 
 			if job == nil {
+				log.Printf("Worker %s: no jobs available, waiting", w.id)
 				// No jobs available, wait a bit
 				time.Sleep(1 * time.Second)
 				continue
 			}
+
+			log.Printf("Worker %s successfully processed job %s", w.id, job.ID)
+			// Job was successfully processed, add small delay before next job
+			// This allows the job lifecycle to complete properly
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
 
 func (w *Worker) pickAndProcessJob(ctx context.Context) (*models.Job, error) {
+	log.Printf("Worker %s: attempting to pick job from queue", w.id)
 	// Atomic job pickup
 	job, err := w.repo.PickJob(ctx, w.id, w.config.VisibilityTimeout)
 	if err != nil {
+		log.Printf("Worker %s: failed to pick job: %v", w.id, err)
 		return nil, fmt.Errorf("failed to pick job: %w", err)
 	}
 
 	if job == nil {
+		log.Printf("Worker %s: no jobs available in queue", w.id)
 		return nil, nil // No jobs available
 	}
+
+	log.Printf("Worker %s: picked job %s from queue %s, status: %s", w.id, job.ID, job.Queue, job.Status)
 
 	// Send job started event
 	w.eventChan <- models.JobEvent{
@@ -91,12 +103,17 @@ func (w *Worker) pickAndProcessJob(ctx context.Context) (*models.Job, error) {
 		Payload:   job.Payload,
 	}
 
+	log.Printf("Worker %s: sent started event for job %s", w.id, job.ID)
+
 	// Process the job
+	log.Printf("Worker %s: starting job processing for job %s", w.id, job.ID)
 	err = w.processJob(ctx, job)
 	if err != nil {
+		log.Printf("Worker %s: job processing failed for job %s: %v", w.id, job.ID, err)
 		return job, fmt.Errorf("job processing failed: %w", err)
 	}
 
+	log.Printf("Worker %s: successfully completed job %s", w.id, job.ID)
 	return job, nil
 }
 

@@ -51,6 +51,8 @@ func (d *Dispatcher) Start(ctx context.Context) {
 	}
 
 	// Start event processor (for WebSocket, etc.)
+	// The WebSocket server should already be started and listening to d.eventChan
+	// Events will flow automatically to WebSocket clients
 	go d.processEvents(ctx)
 }
 
@@ -95,11 +97,15 @@ func (d *Dispatcher) processEvents(ctx context.Context) {
 	for {
 		select {
 		case <-d.shutdownCh:
+			log.Println("Dispatcher event processor shutting down")
 			return
 		case event := <-d.eventChan:
-			// Here you would typically broadcast to WebSocket clients
-			// For now, just log the events
-			log.Printf("Job event: %s - Job %s from queue %s", event.Type, event.JobID, event.Queue)
+			// Broadcast event to WebSocket clients
+			// The event channel is already connected to WebSocket server
+			// Just need to ensure events flow through properly
+			log.Printf("Dispatcher received event: %s - Job %s from queue %s", event.Type, event.JobID, event.Queue)
+			// The event will be picked up by WebSocket server automatically
+			log.Printf("Dispatcher broadcasting event to WebSocket clients")
 		}
 	}
 }

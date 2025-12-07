@@ -123,6 +123,21 @@ func setupDatabase(cfg *config.Config) (*sql.DB, error) {
 func setupRouter(disp *dispatcher.Dispatcher, repo *repository.PostgresRepository, wsServer *websocket.WebSocketServer) *gin.Engine {
 	router := gin.Default()
 
+	// Add CORS middleware
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	// API routes
 	api := router.Group("/api/v1")
 	{
@@ -252,6 +267,30 @@ func setupRouter(disp *dispatcher.Dispatcher, repo *repository.PostgresRepositor
 		// Health check
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+		})
+
+		// Job statistics endpoint
+		api.GET("/stats", func(c *gin.Context) {
+			stats, err := repo.GetJobStats(c.Request.Context())
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			// Calculate total jobs
+			totalJobs := 0
+			for _, count := range stats {
+				totalJobs += count
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"total_jobs":      totalJobs,
+				"pending_jobs":    stats["pending"],
+				"processing_jobs": stats["processing"],
+				"completed_jobs":  stats["completed"],
+				"failed_jobs":     stats["failed"],
+				"cancelled_jobs":  stats["cancelled"],
+			})
 		})
 
 		// WebSocket endpoint

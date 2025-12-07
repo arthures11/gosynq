@@ -24,18 +24,18 @@ const (
 )
 
 type Job struct {
-	ID             string
-	Queue          string
-	Payload        json.RawMessage
-	MaxRetries     int
-	RunAt          time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	Status         JobStatus
-	Priority       JobPriority
-	IdempotencyKey string
-	LockedBy       string
-	LockedAt       *time.Time
+	ID             string          `json:"id"`
+	Queue          string          `json:"queue"`
+	Payload        json.RawMessage `json:"payload"`
+	MaxRetries     int             `json:"max_retries"`
+	RunAt          time.Time       `json:"run_at"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	Status         JobStatus       `json:"status"`
+	Priority       JobPriority     `json:"priority"`
+	IdempotencyKey string          `json:"idempotency_key"`
+	LockedBy       string          `json:"locked_by"`
+	LockedAt       *time.Time      `json:"locked_at,omitempty"`
 }
 
 type JobAttempt struct {

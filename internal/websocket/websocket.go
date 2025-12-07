@@ -91,7 +91,7 @@ func (s *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Request
 	s.clients[client] = true
 	s.clientsMutex.Unlock()
 
-	s.shutdownWg.Add(1)
+	s.shutdownWg.Add(2)
 	go s.writePump(client)
 	go s.readPump(client)
 }

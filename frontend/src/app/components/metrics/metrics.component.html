@@ -1,0 +1,60 @@
+<div class="container mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">System Metrics</h1>
+
+  <!-- Metrics Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Total Jobs Processed</h3>
+      <p class="text-3xl font-bold text-gray-900">{{ metricsData.totalJobsProcessed }}</p>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Success Rate</h3>
+      <p class="text-3xl font-bold text-gray-900">{{ metricsData.successRate }}%</p>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Avg Processing Time</h3>
+      <p class="text-3xl font-bold text-gray-900">{{ metricsData.averageProcessingTime }}</p>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">Active Workers</h3>
+      <p class="text-3xl font-bold text-gray-900">{{ metricsData.currentWorkers }}</p>
+    </div>
+  </div>
+
+  <!-- Queue Status -->
+  <div class="bg-white shadow-sm rounded-lg p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Queue Status</h2>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Queue Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jobs</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr *ngFor="let queue of metricsData.queues">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ queue.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ queue.jobs }}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span [class]="getQueueStatusColor(queue.status)" class="px-2 py-1 rounded-full text-xs font-medium">
+                {{ queue.status | titlecase }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Placeholder for future metrics charts -->
+  <div class="mt-8 bg-gray-50 rounded-lg p-6 text-center">
+    <p class="text-gray-600">Advanced metrics and charts will be available here in future versions.</p>
+    <p class="text-sm text-gray-500 mt-2">This will include real-time graphs, historical data, and performance trends.</p>
+  </div>
+</div>
